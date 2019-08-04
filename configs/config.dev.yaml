@@ -1,0 +1,11 @@
+---
+verbosity: debug
+welcomeString: hello collegues
+port: 8099
+key1: value11
+key2:
+  - listitem21
+  - listitem31
+  - listitem41
+  - listitem51
+  - listitem61
