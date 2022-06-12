@@ -3,6 +3,7 @@ package formatter
 import (
 	"bytes"
 	"fmt"
+	"runtime"
 	"sort"
 	"strings"
 	"time"
@@ -12,13 +13,38 @@ import (
 
 // Formatter - logrus formatter, implements logrus.Formatter
 type Formatter struct {
-	FieldsOrder     []string // default: fields sorted alphabetically
-	TimestampFormat string   // default: time.StampMilli = "Jan _2 15:04:05.000"
-	HideKeys        bool     // show [fieldValue] instead of [fieldKey:fieldValue]
-	NoColors        bool     // disable colors
-	NoFieldsColors  bool     // color only level, default is level + fields
-	ShowFullLevel   bool     // true to show full level [WARNING] instead [WARN]
-	TrimMessages    bool     // true to trim whitespace on messages
+	// FieldsOrder - default: fields sorted alphabetically
+	FieldsOrder []string
+
+	// TimestampFormat - default: time.StampMilli = "Jan _2 15:04:05.000"
+	TimestampFormat string
+
+	// HideKeys - show [fieldValue] instead of [fieldKey:fieldValue]
+	HideKeys bool
+
+	// NoColors - disable colors
+	NoColors bool
+
+	// NoFieldsColors - apply colors only to the level, default is level + fields
+	NoFieldsColors bool
+
+	// NoFieldsSpace - no space between fields
+	NoFieldsSpace bool
+
+	// ShowFullLevel - show a full level [WARNING] instead of [WARN]
+	ShowFullLevel bool
+
+	// NoUppercaseLevel - no upper case for level value
+	NoUppercaseLevel bool
+
+	// TrimMessages - trim whitespaces on messages
+	TrimMessages bool
+
+	// CallerFirst - print caller info first
+	CallerFirst bool
+
+	// CustomCallerFormatter - set custom formatter for caller info
+	CustomCallerFormatter func(*runtime.Frame) string
 }
 
 // Format an log entry
@@ -37,7 +63,16 @@ func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 	b.WriteString(entry.Time.Format(timestampFormat))
 
 	// write level
-	level := strings.ToUpper(entry.Level.String())
+	var level string
+	if f.NoUppercaseLevel {
+		level = entry.Level.String()
+	} else {
+		level = strings.ToUpper(entry.Level.String())
+	}
+
+	if f.CallerFirst {
+		f.writeCaller(b, entry)
+	}
 
 	if !f.NoColors {
 		fmt.Fprintf(b, "\x1b[%dm", levelColor)
@@ -49,7 +84,11 @@ func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 	} else {
 		b.WriteString(level[:4])
 	}
-	b.WriteString("] ")
+	b.WriteString("]")
+
+	if !f.NoFieldsSpace {
+		b.WriteString(" ")
+	}
 
 	if !f.NoColors && f.NoFieldsColors {
 		b.WriteString("\x1b[0m")
@@ -62,6 +101,10 @@ func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 		f.writeOrderedFields(b, entry)
 	}
 
+	if f.NoFieldsSpace {
+		b.WriteString(" ")
+	}
+
 	if !f.NoColors && !f.NoFieldsColors {
 		b.WriteString("\x1b[0m")
 	}
@@ -72,9 +115,30 @@ func (f *Formatter) Format(entry *logrus.Entry) ([]byte, error) {
 	} else {
 		b.WriteString(entry.Message)
 	}
+
+	if !f.CallerFirst {
+		f.writeCaller(b, entry)
+	}
+
 	b.WriteByte('\n')
 
 	return b.Bytes(), nil
+}
+
+func (f *Formatter) writeCaller(b *bytes.Buffer, entry *logrus.Entry) {
+	if entry.HasCaller() {
+		if f.CustomCallerFormatter != nil {
+			fmt.Fprintf(b, f.CustomCallerFormatter(entry.Caller))
+		} else {
+			fmt.Fprintf(
+				b,
+				" (%s:%d %s)",
+				entry.Caller.File,
+				entry.Caller.Line,
+				entry.Caller.Function,
+			)
+		}
+	}
 }
 
 func (f *Formatter) writeFields(b *bytes.Buffer, entry *logrus.Entry) {
@@ -121,9 +185,13 @@ func (f *Formatter) writeOrderedFields(b *bytes.Buffer, entry *logrus.Entry) {
 
 func (f *Formatter) writeField(b *bytes.Buffer, entry *logrus.Entry, field string) {
 	if f.HideKeys {
-		fmt.Fprintf(b, "[%v] ", entry.Data[field])
+		fmt.Fprintf(b, "[%v]", entry.Data[field])
 	} else {
-		fmt.Fprintf(b, "[%s:%v] ", field, entry.Data[field])
+		fmt.Fprintf(b, "[%s:%v]", field, entry.Data[field])
+	}
+
+	if !f.NoFieldsSpace {
+		b.WriteString(" ")
 	}
 }
 
@@ -136,7 +204,7 @@ const (
 
 func getColorByLevel(level logrus.Level) int {
 	switch level {
-	case logrus.DebugLevel:
+	case logrus.DebugLevel, logrus.TraceLevel:
 		return colorGray
 	case logrus.WarnLevel:
 		return colorYellow
