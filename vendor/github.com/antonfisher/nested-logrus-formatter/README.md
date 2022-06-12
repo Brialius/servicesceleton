@@ -12,13 +12,38 @@ Human-readable log formatter, converts _logrus_ fields to a nested structure:
 
 ```go
 type Formatter struct {
-	FieldsOrder     []string // by default fields are sorted alphabetically
-	TimestampFormat string   // by default time.StampMilli = "Jan _2 15:04:05.000" is used
-	HideKeys        bool     // to show only [fieldValue] instead of [fieldKey:fieldValue]
-	NoColors        bool     // to disable all colors
-	NoFieldsColors  bool     // to disable colors only on fields and keep levels colored
-	ShowFullLevel   bool     // to show full level (e.g. [WARNING] instead of [WARN])
-	TrimMessages    bool     // to trim whitespace on messages
+	// FieldsOrder - default: fields sorted alphabetically
+	FieldsOrder []string
+
+	// TimestampFormat - default: time.StampMilli = "Jan _2 15:04:05.000"
+	TimestampFormat string
+
+	// HideKeys - show [fieldValue] instead of [fieldKey:fieldValue]
+	HideKeys bool
+
+	// NoColors - disable colors
+	NoColors bool
+
+	// NoFieldsColors - apply colors only to the level, default is level + fields
+	NoFieldsColors bool
+
+	// NoFieldsSpace - no space between fields
+	NoFieldsSpace bool
+
+	// ShowFullLevel - show a full level [WARNING] instead of [WARN]
+	ShowFullLevel bool
+
+	// NoUppercaseLevel - no upper case for level value
+	NoUppercaseLevel bool
+
+	// TrimMessages - trim whitespaces on messages
+	TrimMessages bool
+
+	// CallerFirst - print caller info first
+	CallerFirst bool
+
+	// CustomCallerFormatter - set custom formatter for caller info
+	CustomCallerFormatter func(*runtime.Frame) string
 }
 ```
 
@@ -42,6 +67,8 @@ log.Info("just info message")
 log.WithField("component", "rest").Warn("warn message")
 // Output: Jan _2 15:04:05.000 [WARN] [rest] warn message
 ```
+
+See more examples in the [tests](./tests/formatter_test.go) file.
 
 ## Development
 
